@@ -39,7 +39,11 @@ ENTRY(phys_startup_32)
 jiffies = jiffies_64;
 #else
 OUTPUT_ARCH(i386:x86-64)
+#ifdef CONFIG_PARAVIRT_USER
+ENTRY(startup_pvuser_64)
+#else
 ENTRY(phys_startup_64)
+#endif
 jiffies_64 = jiffies;
 #endif
 
@@ -213,7 +217,7 @@ SECTIONS
 	 * output PHDR, so the next output section - .init.text - should
 	 * start another segment - init.
 	 */
-	PERCPU_VADDR(INTERNODE_CACHE_BYTES, 0, :percpu)
+	PERCPU_VADDR(INTERNODE_CACHE_BYTES, , :percpu)
 	ASSERT(SIZEOF(.data..percpu) < CONFIG_PHYSICAL_START,
 	       "per-CPU data too large - increase CONFIG_PHYSICAL_START")
 #endif
@@ -400,8 +404,10 @@ INIT_PER_CPU(irq_stack_union);
 	   "kernel image bigger than KERNEL_IMAGE_SIZE");
 
 #ifdef CONFIG_SMP
+#ifndef CONFIG_PARAVIRT_USER
 . = ASSERT((irq_stack_union == 0),
            "irq_stack_union is not at start of per-cpu area");
+#endif
 #endif
 
 #endif /* CONFIG_X86_32 */

@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# This Kconfig describes pvuser options
+#
+
+config PARAVIRT_USER
+	bool "PV-userspace kernel"
+	depends on X86_64 && !X86_5LEVEL && PARAVIRT
