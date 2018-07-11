@@ -38,7 +38,11 @@
  * what Xen requires.
  */
 #define __PAGE_OFFSET_BASE_L5	_AC(0xff10000000000000, UL)
+#ifdef CONFIG_PARAVIRT_USER
+#define __PAGE_OFFSET_BASE_L4	_AC(0x0000000070000000, UL)
+#else
 #define __PAGE_OFFSET_BASE_L4	_AC(0xffff880000000000, UL)
+#endif
 
 #ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
 #define __PAGE_OFFSET           page_offset_base
@@ -46,7 +50,11 @@
 #define __PAGE_OFFSET           __PAGE_OFFSET_BASE_L4
 #endif /* CONFIG_DYNAMIC_MEMORY_LAYOUT */
 
+#ifdef CONFIG_PARAVIRT_USER
+#define __START_KERNEL_map	_AC(0x0000000071000000, UL)
+#else
 #define __START_KERNEL_map	_AC(0xffffffff80000000, UL)
+#endif
 
 /* See Documentation/x86/x86_64/mm.txt for a description of the memory map. */
 

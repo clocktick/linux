@@ -819,6 +819,10 @@ config JAILHOUSE_GUEST
 	  cell. You can leave this option disabled if you only want to start
 	  Jailhouse and run Linux afterwards in the root cell.
 
+config PARAVIRT_USER
+	bool "PV-userspace kernel"
+	depends on X86_64 && !X86_5LEVEL && PARAVIRT
+
 endif #HYPERVISOR_GUEST
 
 config NO_BOOTMEM
