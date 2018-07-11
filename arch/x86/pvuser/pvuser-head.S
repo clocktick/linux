@@ -10,6 +10,7 @@
 #include <asm/percpu.h>
 #include <asm/unwind_hints.h>
 
+	__INIT
 ENTRY(startup_pvuser_64)
 	UNWIND_HINT_EMPTY
 	/* save arguments  */
@@ -30,3 +31,4 @@ ENTRY(startup_pvuser_64)
 	mov %r13, %rsi
 	jmp pvuser_start_kernel
 END(startup_pvuser_64)
+	__FINIT

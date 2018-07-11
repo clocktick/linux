@@ -155,10 +155,10 @@ static struct udrv_ops udrv_ops = {
 	.exit = &exit,
 };
 
-static int udrv_bootstrap(Elf *kelf)
+static int udrv_bootstrap(Elf *kelf, char *cmdline)
 {
 	GElf_Ehdr eh;
-	void (*entry)(struct udrv_ops *, unsigned long);
+	void (*entry)(struct udrv_ops *, char*);
 
 	if (!gelf_getehdr(kelf, &eh)) {
 		fprintf(stderr, "%s:failed to read Ehdr: %s\n", __func__, elf_errmsg(0));
@@ -166,8 +166,26 @@ static int udrv_bootstrap(Elf *kelf)
 	}
 
 	entry = (void*)eh.e_entry;
-	entry(&udrv_ops, 0);
+	entry(&udrv_ops, cmdline);
 	return 0;
+}
+
+#define CMDLINE_SIZE	4096
+static void construct_cmdline(int argc, char *argv[], char *cmdline, int rest)
+{
+	int off, n, a;
+
+	n = off = 0;
+	rest = CMDLINE_SIZE;
+	for (a=0; a<argc && rest>0; a++) {
+		n = snprintf(cmdline+off, rest-off, "%s ", argv[a]);
+		off += n;
+		rest -= n;
+	}
+	if (off > 0 && cmdline[off-1] == ' ')
+		cmdline[off-1] = 0;
+	else
+		cmdline[off] = 0;
 }
 
 int main(int argc, char *argv[])
@@ -175,11 +193,17 @@ int main(int argc, char *argv[])
 	int fd, rc;
 	Elf *kelf;
 	char *fname;
+	char cmdline[CMDLINE_SIZE];
        
-	if (1 == argc)
+	if (1 == argc) {
 		fname = "../../build/vmlinux";
-	else
+		argc = 0;
+	} else {
 		fname = argv[1];
+		argc -= 2;
+		argv += 2;
+	}
+	construct_cmdline(argc, argv, cmdline, CMDLINE_SIZE);
 
 	kelf = open_kelf(fname, &fd);
 	if (!kelf) {
@@ -189,7 +213,7 @@ int main(int argc, char *argv[])
 	if (rc < 0)
 		goto err;
 	fprintf(stderr, "using %s\n", fname);
-	udrv_bootstrap(kelf);
+	udrv_bootstrap(kelf, &cmdline[0]);
 	close_kelf(kelf, fd);
 	return 0;
 err:

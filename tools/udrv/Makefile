@@ -11,6 +11,6 @@ clean:
 	rm -f udrv-loader
 
 run:
-	./udrv-loader
+	./udrv-loader ../../build/vmlinux karg0 karg1=v1
 
 .PHONY:	clean
