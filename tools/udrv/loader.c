@@ -1,18 +1,20 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
+#define _GNU_SOURCE
 #include <unistd.h>
-
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/syscall.h>   /* For SYS_xxx definitions */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <fcntl.h>
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include <gelf.h>
 #include <libelf.h>
 
-#include "udrv_ops.h"
+#include "udrv_user.h"
 
 #define PAGE_SIZE	4096
 #define ALIGN_UP(x,a)	(((x) + (a) - 1) & ~((a) - 1))
@@ -150,11 +152,6 @@ static void close_kelf(Elf *kelf, int fd)
 	close(fd);
 }
 
-static struct udrv_ops udrv_ops = {
-	.log = &printf,
-	.exit = &exit,
-};
-
 static int udrv_bootstrap(Elf *kelf, char *cmdline)
 {
 	GElf_Ehdr eh;
@@ -166,7 +163,7 @@ static int udrv_bootstrap(Elf *kelf, char *cmdline)
 	}
 
 	entry = (void*)eh.e_entry;
-	entry(&udrv_ops, cmdline);
+	entry(udrv_get_ops(), cmdline);
 	return 0;
 }
 
@@ -194,7 +191,7 @@ int main(int argc, char *argv[])
 	Elf *kelf;
 	char *fname;
 	char cmdline[CMDLINE_SIZE];
-       
+
 	if (1 == argc) {
 		fname = "../../build/vmlinux";
 		argc = 0;

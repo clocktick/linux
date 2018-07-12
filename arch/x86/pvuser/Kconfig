@@ -10,3 +10,4 @@ config PARAVIRT_USER
 	depends on !EFI
 	depends on !RANDOMIZE_BASE
 	depends on !XEN
+	depends on !KCOV
