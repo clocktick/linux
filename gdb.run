@@ -1,0 +1,14 @@
+#!/bin/sh
+
+kernel=./build/vmlinux
+cmdline=$1
+offset=0x72000000
+
+gdb \
+	-ex "add-auto-load-safe-path ./scripts/gdb/vmlinux-gdb.py" \
+	-ex "break udrv_bootstrap" \
+	-ex "run $kernel $cmdline" \
+	-ex "add-symbol-file $kernel $offset" \
+	-ex "break pvuser_start_kernel" \
+	-ex "continue" \
+	./tools/udrv/udrv-loader
