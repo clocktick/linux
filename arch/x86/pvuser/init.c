@@ -28,6 +28,8 @@
 
 #include <uapi/asm/udrv_kern.h>
 
+#include "pv.h"
+
 void __init pvuser_start_kernel(struct udrv_ops *ops, char *cmdline)
 {
 	long rc;
@@ -44,13 +46,14 @@ void __init pvuser_start_kernel(struct udrv_ops *ops, char *cmdline)
 	rc = ops->syscall2(__NR_arch_prctl,
 			(long)ARCH_SET_GS,
 			(long)&per_cpu(irq_stack_union, 0));
-	ops->log("x86/prctl(ARCH_SET_GS):%ld\n", rc);
+	ops->log("x86/prctl(ARCH_SET_GS): %ld\n", rc);
 	if (rc < 0)
 		ops->exit(-1);
 
 	memset(&boot_params, 0, sizeof boot_params);
 	sanitize_boot_params(&boot_params);
 
+	hyperu_setup();
 	start_kernel();
 	ops->exit(0);
 }
