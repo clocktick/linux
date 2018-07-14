@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -10,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <execinfo.h>
 
 #include <gelf.h>
 #include <libelf.h>
@@ -105,7 +107,7 @@ static int elf_map_seg(Elf *kelf, int fd, size_t s)
 		prot |= PROT_EXEC;
 	if (PF_R & phdr->p_flags)
 		prot |= PROT_READ;
-	if (PF_W & phdr->p_flags)
+//	if (PF_W & phdr->p_flags)
 		prot |= PROT_WRITE;
 
 	flags = MAP_FIXED;
@@ -123,8 +125,90 @@ static int elf_map_seg(Elf *kelf, int fd, size_t s)
 				addr, (void*)phdr->p_vaddr);
 		return -1;
 	}
+
 	return 0;
 }
+
+/*
+static int elf_symbol_address(Elf *kelf, const char *name, unsigned long *val)
+{
+	int n;
+	Elf_Scn *scn;
+	GElf_Ehdr ehdr_mem, *ehdr;
+	GElf_Shdr shdr_mem, *shdr;
+	Elf_Data *data;
+
+	ehdr = gelf_getehdr (kelf, &ehdr_mem);
+	if (!ehdr)
+		return -1;
+
+	n = 0;
+	for (scn = elf_getscn(kelf, 0); scn; scn = elf_getscn(kelf, ++n)) {
+		int class;
+		size_t nsym, c;
+		char *sym_name;
+
+		shdr = gelf_getshdr (scn, &shdr_mem);
+		if (!shdr)
+			return -1;
+		data = elf_getdata (scn, NULL);
+		if (!data)
+			return -1;
+		if (SHT_SYMTAB != shdr->sh_type)
+			continue;
+
+		class = gelf_getclass (kelf);
+		nsym =  data->d_size;
+		nsym /= (class == ELFCLASS32) ? sizeof (Elf32_Sym) : sizeof (Elf64_Sym);
+		for (c = 0; c < nsym ; c++) {
+			GElf_Sym sym_mem;
+			GElf_Sym *sym = gelf_getsym (data, c, &sym_mem);
+
+			sym_name = elf_strptr(kelf, shdr->sh_link, sym->st_name);
+			if (!sym_name)
+				continue;
+			if (!strcmp(name, sym_name)) {
+				*val = sym->st_value;
+				return 0;
+			}
+		}
+	}
+	return -1;
+}
+
+static int fixup_rodata_mapping(Elf *kelf)
+{
+	unsigned long __start_rodata, __end_rodata;
+	int rc;
+
+	rc = elf_symbol_address(kelf, "__start_rodata", &__start_rodata);
+	if (rc < 0) {
+		fprintf(stderr, "failed to get address of '__start_rodata'\n");
+		return rc;
+	}
+
+	rc = elf_symbol_address(kelf, "__end_rodata", &__end_rodata);
+	if (rc < 0) {
+		fprintf(stderr, "failed to get address of '__end_rodata'\n");
+		return rc;
+	}
+	fprintf(stderr, "rodata: [%016lx - %016lx]\n", __start_rodata, __end_rodata);
+
+	__start_rodata = ALIGN_DOWN(__start_rodata, PAGE_SIZE);
+	__end_rodata = ALIGN_UP(__end_rodata, PAGE_SIZE);
+	rc = mremap((void*)__start_rodata,
+			__end_rodata - __start_rodata,
+			__end_rodata - __start_rodata,
+			MREMAP_FIXED,
+			PROT_READ|PROT_WRITE|PROT_EXEC);
+	if (rc < 0) {
+		fprintf(stderr, "fixup rodata section failure: %s\n", strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
+*/
 
 static int load_elf(Elf *kelf, int fd)
 {
@@ -141,6 +225,11 @@ static int load_elf(Elf *kelf, int fd)
 		if (rc < 0)
 			return rc;
 	}
+#if 0
+	rc = fixup_rodata_mapping(kelf);
+	if (rc < 0)
+		return rc;
+#endif
 
 	return 0;
 }
@@ -185,12 +274,25 @@ static void construct_cmdline(int argc, char *argv[], char *cmdline, int rest)
 		cmdline[off] = 0;
 }
 
+static void dump_my_stack(int sig)
+{
+	void *array[20];
+	size_t size;
+
+	fprintf(stderr, "SIGSEGV:\n");
+	size = backtrace(array, 20);
+	backtrace_symbols_fd(array, size, STDERR_FILENO);
+	exit(1);
+}
+
 int main(int argc, char *argv[])
 {
 	int fd, rc;
 	Elf *kelf;
 	char *fname;
 	char cmdline[CMDLINE_SIZE];
+
+	signal(SIGSEGV, dump_my_stack);
 
 	if (1 == argc) {
 		fname = "../../build/vmlinux";
@@ -210,6 +312,7 @@ int main(int argc, char *argv[])
 	if (rc < 0)
 		goto err;
 	fprintf(stderr, "using %s\n", fname);
+
 	udrv_bootstrap(kelf, &cmdline[0]);
 	close_kelf(kelf, fd);
 	return 0;
