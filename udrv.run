@@ -1,6 +1,0 @@
-#!/bin/sh
-
-kernel=./build/vmlinux
-cmdline=$1
-
-./tools/udrv/udrv-loader $kernel $cmdline

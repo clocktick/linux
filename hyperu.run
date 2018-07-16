@@ -1,0 +1,6 @@
+#!/bin/sh
+
+kernel=./build/vmlinux
+cmdline="$1 earlyprintk=hyperu"
+
+sudo ./tools/hyperu/hyperu-loader $kernel $cmdline
