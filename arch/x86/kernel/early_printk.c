@@ -22,6 +22,7 @@
 #include <linux/efi.h>
 #include <asm/efi.h>
 #include <asm/pci_x86.h>
+#include <asm/hyperu.h>
 
 /* Simple VGA output */
 #define VGABASE		(__ISA_IO_base + 0xb8000)
@@ -382,6 +383,10 @@ static int __init setup_early_printk(char *buf)
 #ifdef CONFIG_EARLY_PRINTK_EFI
 		if (!strncmp(buf, "efi", 3))
 			early_console_register(&early_efi_console, keep);
+#endif
+#ifdef CONFIG_HYPERU
+		if (!strncmp(buf, "hyperu", 6))
+			hyperu_early_console_init(keep);
 #endif
 #ifdef CONFIG_EARLY_PRINTK_USB_XDBC
 		if (!strncmp(buf, "xdbc", 4))

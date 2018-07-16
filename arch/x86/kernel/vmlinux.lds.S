@@ -39,8 +39,8 @@ ENTRY(phys_startup_32)
 jiffies = jiffies_64;
 #else
 OUTPUT_ARCH(i386:x86-64)
-#ifdef CONFIG_PARAVIRT_USER
-ENTRY(startup_pvuser_64)
+#ifdef CONFIG_HYPERU
+ENTRY(startup_hyperu_64)
 #else
 ENTRY(phys_startup_64)
 #endif
@@ -404,7 +404,7 @@ INIT_PER_CPU(irq_stack_union);
 	   "kernel image bigger than KERNEL_IMAGE_SIZE");
 
 #ifdef CONFIG_SMP
-#ifndef CONFIG_PARAVIRT_USER
+#ifndef CONFIG_HYPERU
 . = ASSERT((irq_stack_union == 0),
            "irq_stack_union is not at start of per-cpu area");
 #endif

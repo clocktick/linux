@@ -819,7 +819,7 @@ config JAILHOUSE_GUEST
 	  cell. You can leave this option disabled if you only want to start
 	  Jailhouse and run Linux afterwards in the root cell.
 
-source "arch/x86/pvuser/Kconfig"
+source "arch/x86/hyperu/Kconfig"
 
 endif #HYPERVISOR_GUEST
 

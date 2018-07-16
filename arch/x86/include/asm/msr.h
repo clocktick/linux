@@ -81,6 +81,23 @@ static inline void do_trace_read_msr(unsigned int msr, u64 val, int failed) {}
 static inline void do_trace_rdpmc(unsigned int msr, u64 val, int failed) {}
 #endif
 
+#ifdef CONFIG_HYPERU
+
+#include <asm/hyperu.h>
+
+static inline unsigned long long notrace __rdmsr(unsigned int msr)
+{
+	u64 data;
+	(void)hyperu_rdmsr(msr, &data);
+	return data;
+}
+
+static inline void notrace __wrmsr(unsigned int msr, u32 low, u32 high)
+{
+	hyperu_wrmsr(msr, low, high);
+}
+
+#else
 /*
  * __rdmsr() and __wrmsr() are the two primitives which are the bare minimum MSR
  * accessors and should not have any tracing or other functionality piggybacking
@@ -107,6 +124,7 @@ static inline void notrace __wrmsr(unsigned int msr, u32 low, u32 high)
 		     _ASM_EXTABLE_HANDLE(1b, 2b, ex_handler_wrmsr_unsafe)
 		     : : "c" (msr), "a"(low), "d" (high) : "memory");
 }
+#endif
 
 #define native_rdmsr(msr, val1, val2)			\
 do {							\

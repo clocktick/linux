@@ -65,6 +65,7 @@
 
 #include "../kernel/cpu/cpu.h" /* get_cpu_cap() */
 
+#include <asm/hyperu.h>
 #include "pv.h"
 
 static void __init hyperu_banner(void)
@@ -100,11 +101,10 @@ static void __init hyperu_init_capabilities(void)
 	setup_clear_cpu_cap(X86_FEATURE_PCID);
 
 	setup_force_cpu_cap(X86_FEATURE_MWAIT);
-	if (!hyperu_check_xsave()) {
-		setup_clear_cpu_cap(X86_FEATURE_XSAVE);
-		setup_clear_cpu_cap(X86_FEATURE_OSXSAVE);
-	}
 #endif
+	/* xsetbv() faults in fpu__init_cpu_xstate() */
+	setup_clear_cpu_cap(X86_FEATURE_XSAVE);
+	setup_clear_cpu_cap(X86_FEATURE_OSXSAVE);
 }
 
 static void hyperu_set_debugreg(int reg, unsigned long val)
@@ -181,10 +181,6 @@ static void hyperu_load_sp0(unsigned long sp0)
 	this_cpu_write(cpu_tss_rw.x86_tss.sp0, sp0);
 }
 
-void hyperu_set_iopl_mask(unsigned mask)
-{
-}
-
 static void hyperu_io_delay(void)
 {
 }
@@ -215,77 +211,29 @@ static inline void hyperu_write_cr8(unsigned long val)
 }
 #endif
 
+void hyperu_set_iopl_mask(unsigned mask)
+{
+	int iopl;
+
+	iopl = (mask == 0) ? 1 : (mask >> 12) & 3;
+	hyperu_set_iopl(iopl);
+}
+
 static u64 hyperu_read_msr_safe(unsigned int msr, int *err)
 {
-	/*
-	u64 val;
+	u64 data;
 
-	if (pmu_msr_read(msr, &val, err))
-		return val;
-
-	val = native_read_msr_safe(msr, err);
-	switch (msr) {
-	case MSR_IA32_APICBASE:
-#ifdef CONFIG_X86_X2APIC
-		if (!(cpuid_ecx(1) & (1 << (X86_FEATURE_X2APIC & 31))))
-#endif
-			val &= ~X2APIC_ENABLE;
-		break;
-	}
-	return val;
-	*/
-	return 0;
+	*err = hyperu_rdmsr(msr, &data);
+	return data;
 }
 
 static int hyperu_write_msr_safe(unsigned int msr, unsigned low, unsigned high)
 {
-	int ret;
-
-	ret = 0;
-
-#if 0
-	switch (msr) {
-#ifdef CONFIG_X86_64
-		unsigned which;
-		u64 base;
-
-	case MSR_FS_BASE:		which = SEGBASE_FS; goto set;
-	case MSR_KERNEL_GS_BASE:	which = SEGBASE_GS_USER; goto set;
-	case MSR_GS_BASE:		which = SEGBASE_GS_KERNEL; goto set;
-
-	set:
-		base = ((u64)high << 32) | low;
-		if (HYPERVISOR_set_segment_base(which, base) != 0)
-			ret = -EIO;
-		break;
-#endif
-
-	case MSR_STAR:
-	case MSR_CSTAR:
-	case MSR_LSTAR:
-	case MSR_SYSCALL_MASK:
-	case MSR_IA32_SYSENTER_CS:
-	case MSR_IA32_SYSENTER_ESP:
-	case MSR_IA32_SYSENTER_EIP:
-		/* Fast syscall setup is all done in hypercalls, so
-		   these are all ignored.  Stub them out here to stop
-		   HyperU console noise. */
-		break;
-
-	default:
-		if (!pmu_msr_write(msr, low, high, &ret))
-			ret = native_write_msr_safe(msr, low, high);
-	}
-#endif
-	return ret;
+	return hyperu_wrmsr(msr, low, high);
 }
 
 static u64 hyperu_read_msr(unsigned int msr)
 {
-	/*
-	 * This will silently swallow a #GP from RDMSR.  It may be worth
-	 * changing that.
-	 */
 	int err;
 
 	return hyperu_read_msr_safe(msr, &err);
@@ -293,10 +241,6 @@ static u64 hyperu_read_msr(unsigned int msr)
 
 static void hyperu_write_msr(unsigned int msr, unsigned low, unsigned high)
 {
-	/*
-	 * This will silently swallow a #GP from WRMSR.  It may be worth
-	 * changing that.
-	 */
 	hyperu_write_msr_safe(msr, low, high);
 }
 
@@ -433,6 +377,12 @@ char * __init hyperu_memory_setup(void)
 	return NULL;
 }
 
+void __init hyperu_probe_roms(void)
+{
+	//video roms
+	//system roms
+}
+
 void __init hyperu_arch_setup(void)
 {
 }
@@ -452,6 +402,8 @@ int __init pci_hyperu_init(void)
 
 void __init hyperu_setup(void)
 {
+	int rc;
+
 	setup_features(); // to probe hypervisor version and features
 
 	pv_info = hyperu_info;
@@ -460,6 +412,7 @@ void __init hyperu_setup(void)
 
 	x86_platform.get_nmi_reason = hyperu_get_nmi_reason;
 
+	x86_init.resources.probe_roms = hyperu_probe_roms;
 	x86_init.resources.memory_setup = hyperu_memory_setup;
 	x86_init.irqs.intr_mode_init	= x86_init_noop;
 	x86_init.oem.arch_setup = hyperu_arch_setup;
@@ -520,18 +473,9 @@ void __init hyperu_setup(void)
 	/* set the limit of our address space */
 	hyperu_reserve_top();
 
-	/*
-	 * We used to do this in hyperu_arch_setup, but that is too late
-	 * on AMD were early_cpu_init (run before ->arch_setup()) calls
-	 * early_amd_init which pokes 0xcf8 port.
-	 */
-	/*
-	struct physdev_set_iopl set_iopl;
-	set_iopl.iopl = 1;
-	rc = HYPERVISOR_physdev_op(PHYSDEVOP_set_iopl, &set_iopl);
+	rc = hyperu_set_iopl(3);
 	if (rc != 0)
-		hyperu_raw_printk("physdev_op failed %d\n", rc);
-	*/
+		hyperu_raw_printk("hyperu_set_iopl() failed %d\n", rc);
 
 #ifdef CONFIG_X86_32
 	/* set up basic CPUID stuff */
@@ -558,7 +502,7 @@ void __init hyperu_setup(void)
 		x86_init.mpparse.get_smp_config = x86_init_uint_noop;
 	}
 
-	add_preferred_console("ttyu", 0, NULL);
+	add_preferred_console("hyperu", 0, NULL);
 
 #ifdef CONFIG_PCI
 	/* PCI BIOS service won't work from a PV guest. */

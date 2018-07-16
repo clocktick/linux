@@ -866,7 +866,9 @@ void __init setup_arch(char **cmdline_p)
 
 	idt_setup_early_traps();
 	early_cpu_init();
+#ifndef CONFIG_HYPERU
 	early_ioremap_init();
+#endif
 
 	setup_olpc_ofw_pgd();
 
