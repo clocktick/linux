@@ -16,7 +16,7 @@
 #include <gelf.h>
 #include <libelf.h>
 
-#include "udrv_user.h"
+#include "hyperu_user.h"
 
 #define PAGE_SIZE	4096
 #define ALIGN_UP(x,a)	(((x) + (a) - 1) & ~((a) - 1))
@@ -117,7 +117,7 @@ static int elf_map_seg(Elf *kelf, int fd, size_t s)
 		flags |= MAP_SHARED;
 	addr = mmap((void*)phdr->p_vaddr, bytes, prot, flags, fd, off);
 	if (MAP_FAILED == addr) {
-		fprintf(stderr, "mmap():%s\n", strerror(errno)); 
+		fprintf(stderr, "mmap():%s\n", strerror(errno));
 		return -1;
 	}
 	if (addr != (void*)phdr->p_vaddr) {
@@ -241,10 +241,10 @@ static void close_kelf(Elf *kelf, int fd)
 	close(fd);
 }
 
-static int udrv_bootstrap(Elf *kelf, char *cmdline)
+static int hyperu_bootstrap(struct hyperu *hyperu, Elf *kelf, char *cmdline)
 {
 	GElf_Ehdr eh;
-	void (*entry)(struct udrv_ops *, char*);
+	void (*entry)(struct hyperu_ops *, char*);
 
 	if (!gelf_getehdr(kelf, &eh)) {
 		fprintf(stderr, "%s:failed to read Ehdr: %s\n", __func__, elf_errmsg(0));
@@ -252,7 +252,7 @@ static int udrv_bootstrap(Elf *kelf, char *cmdline)
 	}
 
 	entry = (void*)eh.e_entry;
-	entry(udrv_get_ops(), cmdline);
+	entry(hyperu->ops, cmdline);
 	return 0;
 }
 
@@ -274,6 +274,7 @@ static void construct_cmdline(int argc, char *argv[], char *cmdline, int rest)
 		cmdline[off] = 0;
 }
 
+#if 0
 static void dump_my_stack(int sig)
 {
 	void *array[20];
@@ -284,6 +285,24 @@ static void dump_my_stack(int sig)
 	backtrace_symbols_fd(array, size, STDERR_FILENO);
 	exit(1);
 }
+#endif
+
+static int hyperu_init(struct hyperu *hyperu)
+{
+	int rc;
+
+	hyperu->ops = hyperu_get_ops();
+	rc = init_list__init(hyperu);
+	return rc;
+}
+
+static int hyperu_exit(struct hyperu *hyperu)
+{
+	int rc;
+
+	rc = init_list__exit(hyperu);
+	return rc;
+}
 
 int main(int argc, char *argv[])
 {
@@ -291,8 +310,11 @@ int main(int argc, char *argv[])
 	Elf *kelf;
 	char *fname;
 	char cmdline[CMDLINE_SIZE];
+	struct hyperu hyperu;
 
+#if 0
 	signal(SIGSEGV, dump_my_stack);
+#endif
 
 	if (1 == argc) {
 		fname = "../../build/vmlinux";
@@ -313,7 +335,9 @@ int main(int argc, char *argv[])
 		goto err;
 	fprintf(stderr, "using %s\n", fname);
 
-	udrv_bootstrap(kelf, &cmdline[0]);
+	hyperu_init(&hyperu);
+	hyperu_bootstrap(&hyperu, kelf, &cmdline[0]);
+	hyperu_exit(&hyperu);
 	close_kelf(kelf, fd);
 	return 0;
 err:

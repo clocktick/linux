@@ -1,21 +1,14 @@
 #define _GNU_SOURCE
 #include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <sys/syscall.h>   /* For SYS_xxx definitions */
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
 
-#include <gelf.h>
-#include <libelf.h>
-
-#include "udrv_ops.h"
+#include "hyperu_user.h"
 
 static long syscall0_ret_errno(long nr)
 {
@@ -87,20 +80,23 @@ static long syscall6_ret_errno(long nr, long a0, long a1, long a2, long a3, long
 	return -errno;
 }
 
-static struct udrv_ops udrv_ops = {
-	.log = &printf,
-	.exit = &exit,
-
-	.syscall0 = &syscall0_ret_errno,
-	.syscall1 = &syscall1_ret_errno,
-	.syscall2 = &syscall2_ret_errno,
-	.syscall3 = &syscall3_ret_errno,
-	.syscall4 = &syscall4_ret_errno,
-	.syscall5 = &syscall5_ret_errno,
-	.syscall6 = &syscall6_ret_errno,
-};
-
-struct udrv_ops *udrv_get_ops(void)
+static int linux_init(struct hyperu *hyperu)
 {
-	return (struct udrv_ops *)&udrv_ops;
+	hyperu->ops->syscall0 = &syscall0_ret_errno;
+	hyperu->ops->syscall1 = &syscall1_ret_errno;
+	hyperu->ops->syscall2 = &syscall2_ret_errno;
+	hyperu->ops->syscall3 = &syscall3_ret_errno;
+	hyperu->ops->syscall4 = &syscall4_ret_errno;
+	hyperu->ops->syscall5 = &syscall5_ret_errno;
+	hyperu->ops->syscall6 = &syscall6_ret_errno;
+	fprintf(stderr, "init:linux OK\n");
+	return 0;
 }
+
+static int linux_exit(struct hyperu *hyperu)
+{
+	return 0;
+}
+
+core_init(linux_init);
+core_exit(linux_exit);
