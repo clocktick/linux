@@ -3,7 +3,10 @@ LDFLAGS=`pkg-config --libs libelf`
 
 all: hyperu-loader
 
-LINUX_X86_OBJS=linux/ops.o linux/x86/msr.o linux/x86/io.o
+LINUX_X86_OBJS=linux/ops.o \
+	       linux/x86/msr.o \
+	       linux/x86/io.o \
+	       linux/x86/arch.o
 
 hyperu-loader: loader.o init.o ops.o ${LINUX_X86_OBJS}
 	${CC} $^ ${LDFLAGS} -o $@

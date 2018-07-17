@@ -129,8 +129,7 @@ static int elf_map_seg(Elf *kelf, int fd, size_t s)
 	return 0;
 }
 
-/*
-static int elf_symbol_address(Elf *kelf, const char *name, unsigned long *val)
+int elf_symbol_address(Elf *kelf, const char *name, unsigned long *val)
 {
 	int n;
 	Elf_Scn *scn;
@@ -176,6 +175,7 @@ static int elf_symbol_address(Elf *kelf, const char *name, unsigned long *val)
 	return -1;
 }
 
+/*
 static int fixup_rodata_mapping(Elf *kelf)
 {
 	unsigned long __start_rodata, __end_rodata;
@@ -225,6 +225,7 @@ static int load_elf(Elf *kelf, int fd)
 		if (rc < 0)
 			return rc;
 	}
+
 #if 0
 	rc = fixup_rodata_mapping(kelf);
 	if (rc < 0)
@@ -287,11 +288,13 @@ static void dump_my_stack(int sig)
 }
 #endif
 
-static int hyperu_init(struct hyperu *hyperu)
+static int hyperu_init(struct hyperu *hyperu, Elf *elf, int fd)
 {
 	int rc;
 
 	hyperu->ops = hyperu_get_ops();
+	hyperu->elf = elf;
+	hyperu->fd = fd;
 	rc = init_list__init(hyperu);
 	return rc;
 }
@@ -330,12 +333,14 @@ int main(int argc, char *argv[])
 	if (!kelf) {
 		return -1;
 	}
+	hyperu_init(&hyperu, kelf, fd);
+
 	rc = load_elf(kelf, fd);
 	if (rc < 0)
 		goto err;
 	fprintf(stderr, "using %s\n", fname);
 
-	hyperu_init(&hyperu);
+	arch_init_hyperu(&hyperu);
 	hyperu_bootstrap(&hyperu, kelf, &cmdline[0]);
 	hyperu_exit(&hyperu);
 	close_kelf(kelf, fd);
