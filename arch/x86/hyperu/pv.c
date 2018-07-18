@@ -55,6 +55,7 @@
 #include <asm/mwait.h>
 #include <asm/pci_x86.h>
 #include <asm/cpu.h>
+#include <asm/e820/api.h>
 
 #ifdef CONFIG_ACPI
 #include <linux/acpi.h>
@@ -374,7 +375,7 @@ static void __init setup_features(void)
 
 char * __init hyperu_memory_setup(void)
 {
-	return NULL;
+	return e820__memory_setup_default();
 }
 
 void __init hyperu_probe_roms(void)

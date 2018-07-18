@@ -284,4 +284,8 @@ void __init parse_early_options(char *cmdline);
 #define __exit_p(x) NULL
 #endif
 
+#ifdef CONFIG_HYPERU
+#define __force_data __section(.data)
+#endif
+
 #endif /* _LINUX_INIT_H */

@@ -111,7 +111,6 @@ void __init hyperu_start_kernel(struct hyperu_ops *ops, char *cmdline)
 		ops->exit(-1);
 	}
 	hyperu_raw_printk("kernel cmdline='%s'\n", boot_command_line);
-	memset(&boot_params, 0, sizeof boot_params);
 	sanitize_boot_params(&boot_params);
 
 	hyperu_setup();

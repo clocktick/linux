@@ -136,7 +136,7 @@ RESERVE_BRK(dmi_alloc, 65536);
 static __initdata unsigned long _brk_start = (unsigned long)__brk_base;
 unsigned long _brk_end = (unsigned long)__brk_base;
 
-struct boot_params boot_params;
+struct boot_params boot_params __force_data;
 
 /*
  * Machine setup..
