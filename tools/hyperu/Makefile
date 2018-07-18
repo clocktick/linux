@@ -1,4 +1,5 @@
-CFLAGS=-Wall -g -I ./include `pkg-config --cflags libelf`
+WARNINGS_OPTS=-Werror -Wall -W -Wno-unused-parameter
+CFLAGS=${WARNINGS_OPTS} -g -I ./include `pkg-config --cflags libelf`
 LDFLAGS=`pkg-config --libs libelf`
 
 all: hyperu-loader
@@ -20,4 +21,8 @@ clean:
 run:
 	sudo ./hyperu-loader ../../build/vmlinux karg0 karg1=v1 hello-world
 
-.PHONY:	clean
+index: clean
+	cscope -b -q -R
+	ctags -R
+
+.PHONY:	index clean

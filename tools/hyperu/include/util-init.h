@@ -4,20 +4,24 @@
 #include "util-kernel.h"
 #include "list.h"
 
+#define INIT_F_VERBOSE	0x1
+
 struct hyperu;
+
+typedef int (*initfunc_t)(struct hyperu *, unsigned long);
 
 struct init_item {
 	struct hlist_node n;
 	const char *fn_name;
-	int (*init)(struct hyperu *);
+	initfunc_t init;
 };
 
-int init_list__init(struct hyperu *hyperu);
-int init_list__exit(struct hyperu *hyperu);
+int init_list__init(struct hyperu *hyperu, unsigned long flags);
+int init_list__exit(struct hyperu *hyperu, unsigned long flags);
 
-int init_list_add(struct init_item *t, int (*init)(struct hyperu *),
+int init_list_add(struct init_item *t, initfunc_t init,
 			int priority, const char *name);
-int exit_list_add(struct init_item *t, int (*init)(struct hyperu *),
+int exit_list_add(struct init_item *t, initfunc_t init,
 			int priority, const char *name);
 
 #define __init_list_add(cb, l)						\

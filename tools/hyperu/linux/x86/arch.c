@@ -6,7 +6,16 @@
 
 #include "hyperu_user.h"
 
-int arch_init_hyperu(struct hyperu *hyperu)
+static const char *e820_type2name[] = {
+	[E820_RAM] = "RAM",
+	[E820_RESERVED] = "RESERVED",
+	[E820_ACPI] = "ACPI",
+	[E820_NVS] = "NVS",
+	[E820_UNUSABLE] = "UNUSABLE",
+	[E820_PMEM] = "PMEM",
+};
+
+int hyperu_init_arch(struct hyperu *hyperu, unsigned long flags)
 {
 	int rc, i;
 	struct boot_params *bp;
@@ -16,9 +25,19 @@ int arch_init_hyperu(struct hyperu *hyperu)
 		return -1;
 	memset(bp, 0, sizeof(struct boot_params));
 
+	if (INIT_F_VERBOSE & flags)
+		fprintf(stderr, "E820 mapping@%p:\n", &bp->e820_map[0]);
 	i = 0;
-#define TE(a,s,t) (struct e820entry){a, s, t}
-	bp->e820_map[i++] = TE(0,0xc0000000,E820_RAM);
+#define TE(a,s,t) \
+	({\
+	 	if (INIT_F_VERBOSE & flags) \
+		 	fprintf(stderr, "%d. [%016x - %016x] %s\n", \
+				i, a, s, e820_type2name[t]); \
+		(struct e820entry){a, s, t};\
+	})
+	bp->e820_map[i++] = TE(0000000000, 0x0000FFFF, E820_RAM);
+	bp->e820_map[i++] = TE(0x00010000, 0x000FFFFF, E820_RESERVED);
+	bp->e820_map[i++] = TE(0x00100000, 0x10000000, E820_RAM);
 	bp->e820_entries = i;
 #undef TE
 	return 0;

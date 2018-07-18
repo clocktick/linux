@@ -70,10 +70,10 @@ err:
 	return NULL;
 }
 
-static int elf_map_seg(Elf *kelf, int fd, size_t s)
+static int elf_map_seg(Elf *kelf, int fd, size_t s, unsigned long flags)
 {
 	GElf_Phdr *phdr, mem;
-	int prot, flags;
+	int prot;
 	size_t bytes;
 	off_t off;
 	void *addr;
@@ -86,9 +86,10 @@ static int elf_map_seg(Elf *kelf, int fd, size_t s)
 	if (PT_LOAD != phdr->p_type)
 		return 0;
 	phdr = gelf_getphdr (kelf, s, &mem);
-	fprintf (stderr,
-		      "%ld. type:%x offset:%016lx vaddr:%016lx paddr:%016lx "
-		      "filesz:%016lx memsz:%016lx p_flags:%08x, align:%08lx\n",
+	if (INIT_F_VERBOSE & flags)
+		fprintf (stderr,
+		      "%ld. type:%x offset:%016lx vaddr:%016lx paddr:%016lx\n"
+		      "   filesz:%016lx memsz:%016lx flags:%08x, align:%08lx\n",
 		      s,
 		      phdr->p_type,
 		      phdr->p_offset,
@@ -210,7 +211,7 @@ static int fixup_rodata_mapping(Elf *kelf)
 }
 */
 
-static int load_elf(Elf *kelf, int fd)
+static int load_elf(Elf *kelf, int fd, unsigned long flags)
 {
 	size_t segs, s;
 	int rc;
@@ -220,8 +221,10 @@ static int load_elf(Elf *kelf, int fd)
 		fprintf(stderr, "%s:%s\n", __func__, elf_errmsg(0));
 		return rc;
 	}
+	if (INIT_F_VERBOSE & flags)
+		fprintf(stderr, "kernel ELF address layout:\n");
 	for (s = 0; s < segs; s++) {
-		rc = elf_map_seg(kelf, fd, s);
+		rc = elf_map_seg(kelf, fd, s, flags);
 		if (rc < 0)
 			return rc;
 	}
@@ -242,18 +245,21 @@ static void close_kelf(Elf *kelf, int fd)
 	close(fd);
 }
 
-static int hyperu_bootstrap(struct hyperu *hyperu, Elf *kelf, char *cmdline)
+static int hyperu_bootstrap(struct hyperu *hyperu, unsigned long flags)
 {
 	GElf_Ehdr eh;
 	void (*entry)(struct hyperu_ops *, char*);
 
-	if (!gelf_getehdr(kelf, &eh)) {
+	if (!gelf_getehdr(hyperu->elf, &eh)) {
 		fprintf(stderr, "%s:failed to read Ehdr: %s\n", __func__, elf_errmsg(0));
 		return -1;
 	}
 
+	if (INIT_F_VERBOSE & flags)
+		fprintf(stderr, "=====\nBooting kernel\n=====\n");
+
 	entry = (void*)eh.e_entry;
-	entry(hyperu->ops, cmdline);
+	entry(hyperu->ops, hyperu->cmdline);
 	return 0;
 }
 
@@ -288,32 +294,49 @@ static void dump_my_stack(int sig)
 }
 #endif
 
-static int hyperu_init(struct hyperu *hyperu, Elf *elf, int fd)
+static int hyperu_init(struct hyperu *hyperu, char *kernel, char *cmdline, unsigned long flags)
 {
-	int rc;
+	int rc, fd;
+	Elf *elf;
 
+	elf = open_kelf(kernel, &fd);
+	if (!elf)
+		return -1;
+	rc = load_elf(elf, fd, flags);
+	if (rc < 0)
+		return -1;
+
+	hyperu->kernel = kernel;
+	hyperu->cmdline = cmdline;
 	hyperu->ops = hyperu_get_ops();
 	hyperu->elf = elf;
 	hyperu->fd = fd;
-	rc = init_list__init(hyperu);
+	rc = init_list__init(hyperu, flags);
+	if (rc < 0)
+		return rc;
+	rc = hyperu_init_arch(hyperu, flags);
+	if (rc < 0)
+		return rc;
+
 	return rc;
 }
 
-static int hyperu_exit(struct hyperu *hyperu)
+static int hyperu_exit(struct hyperu *hyperu, unsigned long flags)
 {
 	int rc;
 
-	rc = init_list__exit(hyperu);
+	rc = init_list__exit(hyperu, flags);
+	close_kelf(hyperu->elf, hyperu->fd);
 	return rc;
 }
 
 int main(int argc, char *argv[])
 {
-	int fd, rc;
-	Elf *kelf;
+	int rc;
 	char *fname;
 	char cmdline[CMDLINE_SIZE];
 	struct hyperu hyperu;
+	unsigned long flags;
 
 #if 0
 	signal(SIGSEGV, dump_my_stack);
@@ -327,26 +350,20 @@ int main(int argc, char *argv[])
 		argc -= 2;
 		argv += 2;
 	}
+	flags = INIT_F_VERBOSE;
 	construct_cmdline(argc, argv, cmdline, CMDLINE_SIZE);
 
-	kelf = open_kelf(fname, &fd);
-	if (!kelf) {
+	rc = hyperu_init(&hyperu, fname, cmdline, flags);
+	if (rc < 0)
 		return -1;
-	}
-	hyperu_init(&hyperu, kelf, fd);
-
-	rc = load_elf(kelf, fd);
+	rc = hyperu_bootstrap(&hyperu, flags);
 	if (rc < 0)
 		goto err;
-	fprintf(stderr, "using %s\n", fname);
+	hyperu_exit(&hyperu, flags);
 
-	arch_init_hyperu(&hyperu);
-	hyperu_bootstrap(&hyperu, kelf, &cmdline[0]);
-	hyperu_exit(&hyperu);
-	close_kelf(kelf, fd);
 	return 0;
+
 err:
-	fprintf(stderr, "Failed to load %s\n", fname);
-	close_kelf(kelf, fd);
-	return 0;
+	hyperu_exit(&hyperu, flags);
+	return -1;
 }

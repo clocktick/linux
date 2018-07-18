@@ -18,14 +18,15 @@ static int set_iopl(int level)
 	return rc;
 }
 
-static int io_init(struct hyperu *hyperu)
+static int io_init(struct hyperu *hyperu, unsigned long flags)
 {
 	hyperu->ops->x86.set_iopl = &set_iopl;
-	fprintf(stderr, "init:io OK\n");
+	if (INIT_F_VERBOSE & flags)
+		fprintf(stderr, "init:io OK\n");
 	return 0;
 }
 
-static int io_exit(struct hyperu *hyperu)
+static int io_exit(struct hyperu *hyperu, unsigned long flags)
 {
 	return 0;
 }

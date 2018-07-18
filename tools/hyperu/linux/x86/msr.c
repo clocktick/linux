@@ -71,7 +71,7 @@ int wrmsr(long cpu, long msr, long data)
 	return 0;
 }
 
-static int msr_init(struct hyperu *hyperu)
+static int msr_init(struct hyperu *hyperu, unsigned long flags)
 {
 	int cpu;
 
@@ -100,7 +100,8 @@ static int msr_init(struct hyperu *hyperu)
 
 	hyperu->ops->x86.read_msr = &rdmsr;
 	hyperu->ops->x86.write_msr = &wrmsr;
-	fprintf(stderr, "init:msr OK\n");
+	if (INIT_F_VERBOSE & flags)
+		fprintf(stderr, "init:msr OK\n");
 
 	return 0;
 err:
@@ -112,7 +113,7 @@ err:
 	return -1;
 }
 
-static int msr_exit(struct hyperu *hyperu)
+static int msr_exit(struct hyperu *hyperu, unsigned long flags)
 {
 	int cpu, nr_cpu;
 

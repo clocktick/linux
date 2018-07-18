@@ -80,7 +80,7 @@ static long syscall6_ret_errno(long nr, long a0, long a1, long a2, long a3, long
 	return -errno;
 }
 
-static int linux_init(struct hyperu *hyperu)
+static int linux_init(struct hyperu *hyperu, unsigned long flags)
 {
 	hyperu->ops->syscall0 = &syscall0_ret_errno;
 	hyperu->ops->syscall1 = &syscall1_ret_errno;
@@ -89,11 +89,12 @@ static int linux_init(struct hyperu *hyperu)
 	hyperu->ops->syscall4 = &syscall4_ret_errno;
 	hyperu->ops->syscall5 = &syscall5_ret_errno;
 	hyperu->ops->syscall6 = &syscall6_ret_errno;
-	fprintf(stderr, "init:linux OK\n");
+	if (INIT_F_VERBOSE & flags)
+		fprintf(stderr, "init:linux OK\n");
 	return 0;
 }
 
-static int linux_exit(struct hyperu *hyperu)
+static int linux_exit(struct hyperu *hyperu, unsigned long flags)
 {
 	return 0;
 }
