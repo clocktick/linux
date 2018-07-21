@@ -1,3 +1,4 @@
+#include <asm/e820.h>
 #include <asm/bootparam.h>
 
 #include <stdio.h>
@@ -26,18 +27,18 @@ int hyperu_init_arch(struct hyperu *hyperu, unsigned long flags)
 	memset(bp, 0, sizeof(struct boot_params));
 
 	if (INIT_F_VERBOSE & flags)
-		fprintf(stderr, "E820 mapping@%p:\n", &bp->e820_map[0]);
+		fprintf(stderr, "E820 mapping@%p:\n", &bp->e820_table[0]);
 	i = 0;
 #define TE(a,s,t) \
 	({\
 	 	if (INIT_F_VERBOSE & flags) \
 		 	fprintf(stderr, "%d. [%016x - %016x] %s\n", \
 				i, a, s, e820_type2name[t]); \
-		(struct e820entry){a, s, t};\
+		(struct boot_e820_entry){a, s, t};\
 	})
-	bp->e820_map[i++] = TE(0000000000, 0x0000FFFF, E820_RAM);
-	bp->e820_map[i++] = TE(0x00010000, 0x000FFFFF, E820_RESERVED);
-	bp->e820_map[i++] = TE(0x00100000, 0x10000000, E820_RAM);
+	bp->e820_table[i++] = TE(0000000000, 0x00010000, E820_RAM);
+	bp->e820_table[i++] = TE(0x00010000, 0x00100000, E820_RESERVED);
+	bp->e820_table[i++] = TE(0x00100000, 0x40110000, E820_RAM);
 	bp->e820_entries = i;
 #undef TE
 	return 0;
